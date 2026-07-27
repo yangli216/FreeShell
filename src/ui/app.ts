@@ -636,17 +636,19 @@ export class FreeShellApp {
     widgetSetEdgeInsets(outputScroll, 16, 18, 16, 18);
     widgetSetBackgroundColor(outputScroll, ...COLORS.raised);
 
-    // Invisible interactive input field that captures keyboard typing
-    const input = TextField("", (value) => {
+    // Terminal interactive input field with proper dimensions for system focus
+    const input = TextField("在此输入命令，按 Enter 发送…", (value) => {
       this.terminalDraft = value;
       this.terminalUiDirty = true;
     });
     textfieldSetBorderless(input, 1);
-    textfieldSetFontSize(input, 1);
+    textfieldSetFontSize(input, 13);
     textfieldSetBackgroundColor(input, ...COLORS.raised);
-    textfieldSetTextColor(input, ...COLORS.raised);
-    widgetSetWidth(input, 1);
-    widgetSetHeight(input, 1);
+    textfieldSetTextColor(input, 0.92, 0.95, 0.98, 1);
+    widgetSetControlSize(input, 2);
+    widgetSetHeight(input, 28);
+    widgetSetWidth(input, 780);
+    widgetSetHugging(input, 1);
 
     const submitCommand = () => {
       if (!this.session) return;
@@ -694,7 +696,12 @@ export class FreeShellApp {
     const connect = actionButton(this.session ? "断开" : "连接", () => this.session ? this.disconnect() : this.connect(), true);
     const header = this.buildTopBar("SSH 终端", `${profile.name} · ${profile.host}`, [connect]);
 
-    const consoleHost = VStack(0, [outputScroll, input]);
+    const inputRow = HStack(8, [label("❯", 15, COLORS.green, 0.72), input]);
+    widgetSetHeight(inputRow, 40);
+    widgetSetEdgeInsets(inputRow, 4, 16, 8, 16);
+    widgetSetBackgroundColor(inputRow, ...COLORS.raised);
+
+    const consoleHost = VStack(0, [outputScroll, inputRow]);
     const console = surface(consoleHost, COLORS.raised, 10);
     widgetSetWidth(console, 850);
     widgetSetHeight(console, 665);
