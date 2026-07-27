@@ -629,12 +629,9 @@ export class FreeShellApp {
     const outputScroll = ScrollView();
     scrollviewSetChild(outputScroll, output);
     widgetSetWidth(outputScroll, 850);
-    widgetSetHeight(outputScroll, 610);
+    widgetSetHeight(outputScroll, 580);
     widgetSetEdgeInsets(outputScroll, 16, 18, 16, 18);
     widgetSetBackgroundColor(outputScroll, ...COLORS.raised);
-    setCornerRadius(outputScroll, 10);
-    widgetSetBorderColor(outputScroll, ...COLORS.border);
-    widgetSetBorderWidth(outputScroll, 1);
 
     const input = TextField("在此输入命令，按 Enter 发送…", (value) => { command = value; });
     textfieldSetBorderless(input, 1);
@@ -645,7 +642,8 @@ export class FreeShellApp {
     widgetSetHeight(input, 28);
     widgetSetWidth(input, 780);
     widgetSetHugging(input, 1);
-    textfieldSetOnSubmit(input, () => {
+
+    const submitCommand = () => {
       if (!this.session) return;
       const submitted = command;
       if (submitted.trim()) {
@@ -657,8 +655,11 @@ export class FreeShellApp {
       command = "";
       textfieldSetString(input, "");
       focus(input);
-    });
-    onKeyDown(input, (key, modifiers) => {
+    };
+
+    textfieldSetOnSubmit(input, submitCommand);
+
+    const handleKey = (key: number, modifiers: number) => {
       if (key === Key.ArrowUp && this.commandHistory.length > 0) {
         this.commandHistoryIndex = Math.max(0, this.commandHistoryIndex - 1);
         command = this.commandHistory[this.commandHistoryIndex] ?? "";
@@ -672,16 +673,27 @@ export class FreeShellApp {
         command = "";
         textfieldSetString(input, "");
       }
-    });
-    widgetSetOnClick(outputScroll, () => focus(input));
+    };
+
+    onKeyDown(input, handleKey);
+    onKeyDown(output, handleKey);
+
+    const focusInput = () => focus(input);
+    widgetSetOnClick(outputScroll, focusInput);
+    widgetSetOnClick(output, focusInput);
+
     const connect = actionButton(this.session ? "断开" : "连接", () => this.session ? this.disconnect() : this.connect(), true);
     const header = this.buildTopBar("SSH 终端", `${profile.name} · ${profile.host}`, [connect]);
     const inputRow = HStack(8, [label("❯", 15, COLORS.green, 0.72), input]);
-    widgetSetHeight(inputRow, 42);
-    widgetSetEdgeInsets(inputRow, 6, 16, 8, 16);
-    const console = surface(VStack(0, [outputScroll, Divider(), inputRow]), COLORS.raised, 10);
+    widgetSetHeight(inputRow, 40);
+    widgetSetEdgeInsets(inputRow, 4, 16, 8, 16);
+    widgetSetBackgroundColor(inputRow, ...COLORS.raised);
+
+    const console = surface(VStack(0, [outputScroll, inputRow]), COLORS.raised, 10);
     widgetSetWidth(console, 850);
     widgetSetHeight(console, 665);
+    widgetSetOnClick(console, focusInput);
+
     const body = VStack(10, [header, hInset(0, 0, 22, 18, 22, [console])]);
     this.setContent(body);
     this.terminalOutput = output;
