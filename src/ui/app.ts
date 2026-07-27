@@ -663,7 +663,12 @@ export class FreeShellApp {
         if (this.commandHistory.length > 100) this.commandHistory.shift();
       }
       this.commandHistoryIndex = this.commandHistory.length;
-      this.session.write(`${submitted}\n`);
+      if (submitted.trim() === "q" || submitted.trim() === "quit") {
+        // Send raw 'q' and SIGINT for interactive commands like top/htop/less
+        this.session.write("q\u0003\n");
+      } else {
+        this.session.write(`${submitted}\n`);
+      }
       this.terminalDraft = "";
       textfieldSetString(input, "");
       this.terminalUiDirty = true;
@@ -683,11 +688,13 @@ export class FreeShellApp {
         this.terminalDraft = this.commandHistory[this.commandHistoryIndex] ?? "";
         textfieldSetString(input, this.terminalDraft);
         this.terminalUiDirty = true;
-      } else if (key === Key.C && (modifiers & Modifier.Ctrl) !== 0 && this.session) {
-        this.session.write("\u0003");
-        this.terminalDraft = "";
-        textfieldSetString(input, "");
-        this.terminalUiDirty = true;
+      } else if (key === Key.C && (modifiers & Modifier.Ctrl) !== 0) {
+        if (this.session) {
+          this.session.write("\u0003");
+          this.terminalDraft = "";
+          textfieldSetString(input, "");
+          this.terminalUiDirty = true;
+        }
       }
     };
 
@@ -698,8 +705,17 @@ export class FreeShellApp {
     widgetSetOnClick(outputScroll, focusInput);
     widgetSetOnClick(output, focusInput);
 
+    const sendInterrupt = actionButton("中断 / 退出 (q)", () => {
+      if (this.session) {
+        this.session.write("q\u0003\n");
+        this.terminalDraft = "";
+        textfieldSetString(input, "");
+        this.terminalUiDirty = true;
+      }
+    });
+
     const connect = actionButton(this.session ? "断开" : "连接", () => this.session ? this.disconnect() : this.connect(), true);
-    const header = this.buildTopBar("SSH 终端", `${profile.name} · ${profile.host}`, [connect]);
+    const header = this.buildTopBar("SSH 终端", `${profile.name} · ${profile.host}`, [sendInterrupt, connect]);
 
     const inputRow = HStack(8, [label("❯", 15, COLORS.green, 0.72), input]);
     widgetSetHeight(inputRow, 40);
