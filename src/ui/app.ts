@@ -780,6 +780,7 @@ export class FreeShellApp {
     let remotePath = defaultHome;
     let selectedRemoteFile = "";
     const listHost = VStack(4, [label("点击“刷新目录”读取远程文件。", 12, COLORS.muted)]);
+    widgetSetHugging(listHost, 1);
     const pathInput = field(remotePath, (value) => { remotePath = value; });
     textfieldSetString(pathInput.input, remotePath);
 
@@ -789,27 +790,52 @@ export class FreeShellApp {
       try {
         const files = await this.ssh.listDirectory(profile, remotePath, this.passwordFor(profile));
         widgetClearChildren(listHost);
-        widgetAddChild(listHost, HStack(12, [label("名称", 11, COLORS.muted), Spacer(), label("大小", 11, COLORS.muted), label("修改时间", 11, COLORS.muted)]));
+
+        // Header Row
+        const headerName = label("名称", 12, COLORS.muted);
+        const headerSize = label("大小", 12, COLORS.muted);
+        const headerTime = label("修改时间", 12, COLORS.muted);
+        widgetSetWidth(headerSize, 100);
+        widgetSetWidth(headerTime, 160);
+        const headerRow = HStack(12, [headerName, Spacer(), headerSize, headerTime]);
+        widgetSetEdgeInsets(headerRow, 4, 14, 6, 14);
+        widgetAddChild(listHost, headerRow);
+
+        let activeSelectedRow: Widget | undefined;
+
         for (const file of files) {
-          const kindLabel = file.kind === "directory" ? "目录" : file.kind === "link" ? "链接" : "文件";
-          const row = listActionButton(
-            `${kindLabel}  ${file.name}`,
-            `${file.kind === "file" ? formatBytes(file.size) : "—"}  ·  ${file.modifiedAt}`,
-            () => {
-              if (file.kind === "directory") {
-                remotePath = file.path;
-                selectedRemoteFile = "";
-                textfieldSetString(pathInput.input, remotePath);
-                void refreshDirectory();
-              } else {
-                selectedRemoteFile = file.path;
-                widgetSetBackgroundColor(row, 0.11, 0.18, 0.25, 1);
+          const icon = file.kind === "directory" ? "📁" : file.kind === "link" ? "🔗" : "📄";
+          const nameLabel = label(`${icon}  ${file.name}`, 13, file.kind === "directory" ? COLORS.text : COLORS.text);
+          const sizeText = file.kind === "file" ? formatBytes(file.size) : "—";
+          const sizeLabel = label(sizeText, 12, COLORS.muted);
+          const timeLabel = label(file.modifiedAt || "—", 12, COLORS.muted);
+          widgetSetWidth(sizeLabel, 100);
+          widgetSetWidth(timeLabel, 160);
+
+          const rowContent = HStack(12, [nameLabel, Spacer(), sizeLabel, timeLabel]);
+          stackSetAlignment(rowContent, 3);
+
+          const row = surface(rowContent, COLORS.buttonSecondary, 6);
+          widgetSetHeight(row, 36);
+          widgetSetHugging(row, 1);
+          widgetSetEdgeInsets(row, 6, 14, 6, 14);
+
+          widgetSetOnClick(row, () => {
+            if (file.kind === "directory") {
+              remotePath = file.path;
+              selectedRemoteFile = "";
+              textfieldSetString(pathInput.input, remotePath);
+              void refreshDirectory();
+            } else {
+              selectedRemoteFile = file.path;
+              if (activeSelectedRow) {
+                widgetSetBackgroundColor(activeSelectedRow, ...COLORS.buttonSecondary);
               }
-            },
-            false,
-            810,
-            48,
-          );
+              activeSelectedRow = row;
+              widgetSetBackgroundColor(row, ...COLORS.accent);
+            }
+          });
+
           widgetAddChild(listHost, row);
         }
       } catch (error) {
@@ -853,9 +879,11 @@ export class FreeShellApp {
     const refresh = actionButton("刷新目录", () => { void refreshDirectory(); }, true);
     const header = this.buildTopBar("文件传输", `${profile.name} · SCP/SFTP 工作区`, [upload, download, refresh]);
     const pathBar = hInset(8, 0, 22, 0, 22, [label("路径", 11, COLORS.muted), pathInput.root]);
-    const fileSurface = surface(VStack(8, [listHost]));
-    widgetSetWidth(fileSurface, 850);
-    widgetSetHeight(fileSurface, 650);
+    const scroll = ScrollView();
+    scrollviewSetChild(scroll, listHost);
+    widgetSetHugging(scroll, 1);
+    const fileSurface = surface(VStack(8, [scroll]));
+    widgetSetHugging(fileSurface, 1);
     inset(fileSurface, 14);
     this.setContent(VStack(12, [header, pathBar, hInset(0, 0, 22, 18, 22, [fileSurface])]));
   }
