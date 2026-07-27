@@ -64,6 +64,7 @@ import {
   quickActionButton,
   setTheme,
   surface,
+  terminalMono,
 } from "./theme.ts";
 
 type ViewName = "dashboard" | "terminal" | "files" | "monitoring" | "settings";
@@ -621,7 +622,7 @@ export class FreeShellApp {
     const profile = this.selectedProfile();
     if (!profile) return this.renderDashboard();
     let command = "";
-    const output = mono(this.terminalBuffer, 13);
+    const output = terminalMono(this.terminalBuffer, 13);
     textSetSelectable(output, 1);
     textSetWraps(output, 810);
     widgetSetWidth(output, 810);
@@ -631,12 +632,15 @@ export class FreeShellApp {
     widgetSetHeight(outputScroll, 610);
     widgetSetEdgeInsets(outputScroll, 16, 18, 16, 18);
     widgetSetBackgroundColor(outputScroll, ...COLORS.raised);
+    setCornerRadius(outputScroll, 10);
+    widgetSetBorderColor(outputScroll, ...COLORS.border);
+    widgetSetBorderWidth(outputScroll, 1);
 
     const input = TextField("在此输入命令，按 Enter 发送…", (value) => { command = value; });
     textfieldSetBorderless(input, 1);
     textfieldSetFontSize(input, 13);
     textfieldSetBackgroundColor(input, ...COLORS.raised);
-    textfieldSetTextColor(input, ...COLORS.text);
+    textfieldSetTextColor(input, 0.92, 0.95, 0.98, 1);
     widgetSetControlSize(input, 2);
     widgetSetHeight(input, 28);
     widgetSetWidth(input, 780);
