@@ -296,7 +296,9 @@ export class SshService {
 
   async listDirectory(profile: ServerProfile, remotePath: string, password?: string): Promise<RemoteFile[]> {
     const quoted = shellQuote(remotePath);
-    const command = `if [ ! -d ${quoted} ]; then echo "DIRECTORY_NOT_FOUND" >&2; exit 2; fi; find ${quoted} -mindepth 1 -maxdepth 1 -printf '%y\\t%s\\t%M\\t%TY-%Tm-%Td %TH:%TM\\t%f\\n'`;
+    // Use POSIX-compatible ls -lA instead of GNU find -printf for broader compatibility
+    // (Alpine, BusyBox, minimal containers, macOS remote hosts, etc.)
+    const command = `if [ ! -d ${quoted} ]; then echo "DIRECTORY_NOT_FOUND" >&2; exit 2; fi; ls -lA --time-style=long-iso ${quoted} 2>/dev/null || ls -lA ${quoted}`;
     const invocation = buildSshInvocation(profile, command);
     const result = await runProcess(invocation.executable, invocation.args, passwordEnvironment(profile, password));
     if (result.code !== 0) {
@@ -310,20 +312,56 @@ export class SshService {
       throw new Error(err || `无法读取远程目录 "${remotePath}"`);
     }
 
-    return result.stdout.split(/\r?\n/).filter(Boolean).map((line) => {
-      const [kind, size, permissions, modifiedAt, ...nameParts] = line.split("\t");
-      const name = nameParts.join("\t");
-      const base = remotePath.endsWith("/") ? remotePath.slice(0, -1) : remotePath;
-      const fileKind: RemoteFile["kind"] = kind === "d" ? "directory" : kind === "l" ? "link" : "file";
+    const base = remotePath.endsWith("/") ? remotePath.slice(0, -1) : remotePath;
+    return result.stdout.split(/\r?\n/).filter((line) => {
+      // Skip empty lines, "total N" header, and lines that are too short
+      if (!line.trim()) return false;
+      if (/^total\s+\d+/.test(line.trim())) return false;
+      return true;
+    }).map((line) => {
+      // ls -lA format: permissions links owner group size date time name
+      // e.g.: drwxr-xr-x 2 root root 4096 2025-07-20 10:30 dirname
+      // or:   -rw-r--r-- 1 root root 1234 Jul 20 10:30 filename
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 8) return null;
+
+      const permissions = parts[0];
+      const firstChar = permissions.charAt(0);
+      const fileKind: RemoteFile["kind"] = firstChar === "d" ? "directory" : firstChar === "l" ? "link" : "file";
+      const size = Number.parseInt(parts[4], 10) || 0;
+
+      // Date+time: could be "2025-07-20 10:30" (long-iso) or "Jul 20 10:30" / "Jul 20  2024"
+      let modifiedAt: string;
+      let nameStartIndex: number;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(parts[5])) {
+        // long-iso format: date time name...
+        modifiedAt = `${parts[5]} ${parts[6]}`;
+        nameStartIndex = 7;
+      } else {
+        // classic format: Mon DD HH:MM or Mon DD YYYY
+        modifiedAt = `${parts[5]} ${parts[6]} ${parts[7]}`;
+        nameStartIndex = 8;
+      }
+
+      let name = parts.slice(nameStartIndex).join(" ");
+      // For symlinks, remove " -> target" suffix
+      if (fileKind === "link") {
+        const arrowIndex = name.indexOf(" -> ");
+        if (arrowIndex !== -1) name = name.substring(0, arrowIndex);
+      }
+
+      if (!name) return null;
+
       return {
         name,
         path: `${base}/${name}`,
         kind: fileKind,
-        size: Number.parseInt(size, 10) || 0,
+        size,
         modifiedAt,
         permissions,
       };
-    }).sort((a, b) => a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "directory" ? -1 : 1);
+    }).filter((entry): entry is RemoteFile => entry !== null)
+      .sort((a, b) => a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "directory" ? -1 : 1);
   }
 
   async upload(profile: ServerProfile, localPath: string, remotePath: string, password?: string): Promise<void> {

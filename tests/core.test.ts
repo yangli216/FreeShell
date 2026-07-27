@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { ServerProfile } from "../src/core/models.ts";
 import { parseMetrics } from "../src/core/metrics.ts";
-import { limitTerminalLines, sanitizeTerminalOutput } from "../src/core/terminal.ts";
+import { appendTerminalChunk, limitTerminalLines, sanitizeTerminalOutput } from "../src/core/terminal.ts";
 import { buildScpUploadArgs, buildSshArgs, buildSshInvocation } from "../src/core/ssh-command.ts";
 import { formatSshError, parseHostKeyLines } from "../src/services/ssh-service.ts";
 import { normalizeProfile, validateProfile } from "../src/core/validation.ts";
@@ -146,3 +146,18 @@ test("configures SSH keepalive parameters for session persistence", () => {
   assert.ok(args.includes("ServerAliveCountMax=3"));
 });
 
+test("appendTerminalChunk appends normal output incrementally", () => {
+  const buffer = "[root@host ~]# ";
+  const result = appendTerminalChunk(buffer, "ls\nfile1  file2\n");
+  assert.ok(result.includes("[root@host ~]# ls"));
+  assert.ok(result.includes("file1  file2"));
+});
+
+test("appendTerminalChunk replaces buffer on screen-clear for top/htop", () => {
+  const buffer = "old buffer content\nold line 2\n";
+  const topFrame = "\x1B[2J\x1B[Htop - 10:00:00 up 5 days\nTasks: 150 total";
+  const result = appendTerminalChunk(buffer, topFrame);
+  assert.ok(!result.includes("old buffer content"));
+  assert.ok(result.includes("top - 10:00:00 up 5 days"));
+  assert.ok(result.includes("Tasks: 150 total"));
+});

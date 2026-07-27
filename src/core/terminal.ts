@@ -31,3 +31,19 @@ export function limitTerminalLines(buffer: string, maxLines = 1000): string {
   return lines.slice(-maxLines).join("\n");
 }
 
+const CLEAR_SEQUENCE_REGEX = /(?:\x1B\[2J|\x1B\[3J|\x1B\[H|\x1B\[1;1H|\x1B\[f)/;
+
+/** Efficiently append a terminal chunk to an existing buffer.
+ * When the chunk contains screen-clear sequences (top/htop/watch), the buffer
+ * is replaced with only the new frame rather than growing unboundedly.
+ */
+export function appendTerminalChunk(existingBuffer: string, chunk: string): string {
+  // If the new chunk contains a screen-clear sequence, the full-screen app
+  // is refreshing. Discard the old buffer and keep only the latest frame.
+  if (CLEAR_SEQUENCE_REGEX.test(chunk)) {
+    return sanitizeTerminalOutput(chunk);
+  }
+  // Normal incremental output: append and sanitize the combined result.
+  return limitTerminalLines(sanitizeTerminalOutput(existingBuffer + chunk), 1200);
+}
+

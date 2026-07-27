@@ -47,7 +47,7 @@ import {
 } from "perry/ui";
 import { keychainDelete, keychainGet, keychainSave } from "perry/system";
 import type { ConnectionStatus, ServerProfile } from "../core/models.ts";
-import { limitTerminalLines, sanitizeTerminalOutput } from "../core/terminal.ts";
+import { appendTerminalChunk, limitTerminalLines, sanitizeTerminalOutput } from "../core/terminal.ts";
 import { createProfileId } from "../core/validation.ts";
 import { ProfileStore } from "../services/profile-store.ts";
 import { SshService, type HostKeyIdentity, type RunningSession } from "../services/ssh-service.ts";
@@ -566,7 +566,7 @@ export class FreeShellApp {
       this.session = this.ssh.openTerminal(profile, {
         onOutput: (chunk) => {
           if (attempt !== this.connectionAttempt) return;
-          this.terminalBuffer = limitTerminalLines(sanitizeTerminalOutput(this.terminalBuffer + chunk), 1200);
+          this.terminalBuffer = appendTerminalChunk(this.terminalBuffer, chunk);
           this.terminalUiDirty = true;
         },
         onStatus: (status, message) => {
@@ -626,8 +626,8 @@ export class FreeShellApp {
     const initialText = this.terminalDraft ? `${this.terminalBuffer}${this.terminalDraft}█` : `${this.terminalBuffer}█`;
     const output = terminalMono(initialText, 13);
     textSetSelectable(output, 1);
-    textSetWraps(output, 810);
-    widgetSetWidth(output, 810);
+    textSetWraps(output, 100000);
+    widgetSetHugging(output, 1);
 
     const outputScroll = ScrollView();
     scrollviewSetChild(outputScroll, output);
@@ -656,12 +656,7 @@ export class FreeShellApp {
         if (this.commandHistory.length > 100) this.commandHistory.shift();
       }
       this.commandHistoryIndex = this.commandHistory.length;
-      if (submitted.trim() === "q" || submitted.trim() === "quit") {
-        // Send raw 'q' and SIGINT for interactive commands like top/htop/less
-        this.session.write("q\u0003\n");
-      } else {
-        this.session.write(`${submitted}\n`);
-      }
+      this.session.write(`${submitted}\n`);
       this.terminalDraft = "";
       textfieldSetString(input, "");
       this.terminalUiDirty = true;
@@ -683,7 +678,7 @@ export class FreeShellApp {
         this.terminalUiDirty = true;
       } else if (key === Key.C && (modifiers & Modifier.Ctrl) !== 0) {
         if (this.session) {
-          this.session.write("\u0003");
+          this.session.write("\x03");
           this.terminalDraft = "";
           textfieldSetString(input, "");
           this.terminalUiDirty = true;
@@ -698,9 +693,17 @@ export class FreeShellApp {
     widgetSetOnClick(outputScroll, focusInput);
     widgetSetOnClick(output, focusInput);
 
-    const sendInterrupt = actionButton("中断 / 退出 (q)", () => {
+    const sendCtrlC = actionButton("Ctrl+C", () => {
       if (this.session) {
-        this.session.write("q\u0003\n");
+        this.session.write("\x03");
+        this.terminalDraft = "";
+        textfieldSetString(input, "");
+        this.terminalUiDirty = true;
+      }
+    });
+    const sendQuit = actionButton("q 退出", () => {
+      if (this.session) {
+        this.session.write("q");
         this.terminalDraft = "";
         textfieldSetString(input, "");
         this.terminalUiDirty = true;
@@ -708,7 +711,7 @@ export class FreeShellApp {
     });
 
     const connect = actionButton(this.session ? "断开" : "连接", () => this.session ? this.disconnect() : this.connect(), true);
-    const header = this.buildTopBar("SSH 终端", `${profile.name} · ${profile.host}`, [sendInterrupt, connect]);
+    const header = this.buildTopBar("SSH 终端", `${profile.name} · ${profile.host}`, [sendCtrlC, sendQuit, connect]);
 
     const inputRow = HStack(8, [label("❯", 15, COLORS.green, 0.72), input]);
     widgetSetHeight(inputRow, 40);
@@ -886,6 +889,8 @@ export class FreeShellApp {
     widgetSetHugging(fileSurface, 1);
     inset(fileSurface, 14);
     this.setContent(VStack(12, [header, pathBar, hInset(0, 0, 22, 18, 22, [fileSurface])]));
+    // Auto-refresh directory on entering the files tab
+    void refreshDirectory();
   }
 
   private renderSettings(): void {
