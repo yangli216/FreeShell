@@ -173,6 +173,7 @@ export class FreeShellApp {
   private connectionAttempt = 0;
   private pendingHostKeyPrompt?: PendingHostKeyPrompt;
   private terminalBuffer = "FreeShell 0.1 · Perry Native\n选择服务器并点击连接以启动 SSH 会话。\n";
+  private terminalDraft = "";
   private terminalUiDirty = false;
   private terminalOutput?: Widget;
   private terminalScroll?: Widget;
@@ -350,7 +351,8 @@ export class FreeShellApp {
     if (this.terminalUiDirty) {
       this.terminalUiDirty = false;
       if (this.terminalOutput) {
-        textSetString(this.terminalOutput, this.terminalBuffer);
+        const displayText = this.terminalDraft ? `${this.terminalBuffer}${this.terminalDraft}█` : `${this.terminalBuffer}█`;
+        textSetString(this.terminalOutput, displayText);
         if (this.terminalScroll) scrollViewScrollTo(this.terminalScroll, 0, 1000000);
       }
     }
@@ -621,39 +623,43 @@ export class FreeShellApp {
   private renderTerminal(): void {
     const profile = this.selectedProfile();
     if (!profile) return this.renderDashboard();
-    let command = "";
-    const output = terminalMono(this.terminalBuffer, 13);
+    const initialText = this.terminalDraft ? `${this.terminalBuffer}${this.terminalDraft}█` : `${this.terminalBuffer}█`;
+    const output = terminalMono(initialText, 13);
     textSetSelectable(output, 1);
     textSetWraps(output, 810);
     widgetSetWidth(output, 810);
+
     const outputScroll = ScrollView();
     scrollviewSetChild(outputScroll, output);
     widgetSetWidth(outputScroll, 850);
-    widgetSetHeight(outputScroll, 580);
+    widgetSetHeight(outputScroll, 620);
     widgetSetEdgeInsets(outputScroll, 16, 18, 16, 18);
     widgetSetBackgroundColor(outputScroll, ...COLORS.raised);
 
-    const input = TextField("在此输入命令，按 Enter 发送…", (value) => { command = value; });
+    // Invisible interactive input field that captures keyboard typing
+    const input = TextField("", (value) => {
+      this.terminalDraft = value;
+      this.terminalUiDirty = true;
+    });
     textfieldSetBorderless(input, 1);
-    textfieldSetFontSize(input, 13);
+    textfieldSetFontSize(input, 1);
     textfieldSetBackgroundColor(input, ...COLORS.raised);
-    textfieldSetTextColor(input, 0.92, 0.95, 0.98, 1);
-    widgetSetControlSize(input, 2);
-    widgetSetHeight(input, 28);
-    widgetSetWidth(input, 780);
-    widgetSetHugging(input, 1);
+    textfieldSetTextColor(input, ...COLORS.raised);
+    widgetSetWidth(input, 1);
+    widgetSetHeight(input, 1);
 
     const submitCommand = () => {
       if (!this.session) return;
-      const submitted = command;
+      const submitted = this.terminalDraft;
       if (submitted.trim()) {
         if (this.commandHistory.at(-1) !== submitted) this.commandHistory.push(submitted);
         if (this.commandHistory.length > 100) this.commandHistory.shift();
       }
       this.commandHistoryIndex = this.commandHistory.length;
-      this.session.write(`${command}\n`);
-      command = "";
+      this.session.write(`${submitted}\n`);
+      this.terminalDraft = "";
       textfieldSetString(input, "");
+      this.terminalUiDirty = true;
       focus(input);
     };
 
@@ -662,16 +668,19 @@ export class FreeShellApp {
     const handleKey = (key: number, modifiers: number) => {
       if (key === Key.ArrowUp && this.commandHistory.length > 0) {
         this.commandHistoryIndex = Math.max(0, this.commandHistoryIndex - 1);
-        command = this.commandHistory[this.commandHistoryIndex] ?? "";
-        textfieldSetString(input, command);
+        this.terminalDraft = this.commandHistory[this.commandHistoryIndex] ?? "";
+        textfieldSetString(input, this.terminalDraft);
+        this.terminalUiDirty = true;
       } else if (key === Key.ArrowDown && this.commandHistory.length > 0) {
         this.commandHistoryIndex = Math.min(this.commandHistory.length, this.commandHistoryIndex + 1);
-        command = this.commandHistory[this.commandHistoryIndex] ?? "";
-        textfieldSetString(input, command);
+        this.terminalDraft = this.commandHistory[this.commandHistoryIndex] ?? "";
+        textfieldSetString(input, this.terminalDraft);
+        this.terminalUiDirty = true;
       } else if (key === Key.C && (modifiers & Modifier.Ctrl) !== 0 && this.session) {
         this.session.write("\u0003");
-        command = "";
+        this.terminalDraft = "";
         textfieldSetString(input, "");
+        this.terminalUiDirty = true;
       }
     };
 
@@ -684,12 +693,9 @@ export class FreeShellApp {
 
     const connect = actionButton(this.session ? "断开" : "连接", () => this.session ? this.disconnect() : this.connect(), true);
     const header = this.buildTopBar("SSH 终端", `${profile.name} · ${profile.host}`, [connect]);
-    const inputRow = HStack(8, [label("❯", 15, COLORS.green, 0.72), input]);
-    widgetSetHeight(inputRow, 40);
-    widgetSetEdgeInsets(inputRow, 4, 16, 8, 16);
-    widgetSetBackgroundColor(inputRow, ...COLORS.raised);
 
-    const console = surface(VStack(0, [outputScroll, inputRow]), COLORS.raised, 10);
+    const consoleHost = VStack(0, [outputScroll, input]);
+    const console = surface(consoleHost, COLORS.raised, 10);
     widgetSetWidth(console, 850);
     widgetSetHeight(console, 665);
     widgetSetOnClick(console, focusInput);
