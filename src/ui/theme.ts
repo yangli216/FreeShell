@@ -47,15 +47,15 @@ const LIGHT_COLORS: typeof DARK_COLORS = {
   sidebar: [0.91, 0.93, 0.96, 1],
   panel: [1.0, 1.0, 1.0, 1],
   raised: [0.05, 0.07, 0.10, 1],
-  border: [0.84, 0.87, 0.92, 1],
+  border: [0.82, 0.86, 0.91, 1],
   text: [0.10, 0.14, 0.20, 1],
-  muted: [0.45, 0.52, 0.60, 1],
-  navText: [0.18, 0.24, 0.32, 1],
-  accent: [0.14, 0.52, 0.88, 1],
-  accentStrong: [0.08, 0.42, 0.78, 1],
-  buttonSecondary: [0.90, 0.93, 0.96, 1],
-  buttonNav: [0.92, 0.94, 0.96, 1],
-  buttonInk: [0.10, 0.14, 0.20, 1],
+  muted: [0.42, 0.48, 0.58, 1],
+  navText: [0.12, 0.18, 0.26, 1],
+  accent: [0.75, 0.86, 0.98, 1],
+  accentStrong: [0.65, 0.78, 0.94, 1],
+  buttonSecondary: [0.92, 0.94, 0.97, 1],
+  buttonNav: [0.94, 0.95, 0.97, 1],
+  buttonInk: [0.08, 0.12, 0.18, 1],
   green: [0.08, 0.58, 0.36, 1],
   yellow: [0.78, 0.46, 0.08, 1],
   red: [0.80, 0.18, 0.25, 1],
@@ -133,9 +133,8 @@ export function actionButton(title: string, onPress: () => void, primary = false
   widgetSetHeight(button, 34);
   widgetSetHugging(button, 750);
   widgetSetControlSize(button, 2);
-  const ink = primary ? ([1, 1, 1, 1] as Color) : COLORS.buttonInk;
-  buttonSetContentTintColor(button, ...ink);
-  buttonSetTextColor(button, ...ink);
+  buttonSetContentTintColor(button, ...COLORS.buttonInk);
+  buttonSetTextColor(button, ...COLORS.buttonInk);
   widgetSetTooltip(button, title);
   return button;
 }
@@ -150,9 +149,8 @@ export function navButton(title: string, onPress: () => void, active = false): W
   widgetSetHeight(button, 36);
   widgetSetHugging(button, 750);
   widgetSetControlSize(button, 2);
-  const ink = active ? ([1, 1, 1, 1] as Color) : COLORS.buttonInk;
-  buttonSetContentTintColor(button, ...ink);
-  buttonSetTextColor(button, ...ink);
+  buttonSetContentTintColor(button, ...COLORS.buttonInk);
+  buttonSetTextColor(button, ...COLORS.buttonInk);
   widgetSetTooltip(button, title);
   return button;
 }
@@ -194,9 +192,8 @@ export function listActionButton(
   widgetSetHeight(button, height);
   widgetSetHugging(button, 750);
   widgetSetControlSize(button, 2);
-  const ink = selected ? ([1, 1, 1, 1] as Color) : COLORS.buttonInk;
-  buttonSetContentTintColor(button, ...ink);
-  buttonSetTextColor(button, ...ink);
+  buttonSetContentTintColor(button, ...COLORS.buttonInk);
+  buttonSetTextColor(button, ...COLORS.buttonInk);
   widgetSetTooltip(button, subtitle ? `${title} · ${subtitle}` : title);
   return button;
 }
