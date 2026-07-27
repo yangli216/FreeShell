@@ -296,10 +296,19 @@ export class SshService {
 
   async listDirectory(profile: ServerProfile, remotePath: string, password?: string): Promise<RemoteFile[]> {
     const quoted = shellQuote(remotePath);
-    const command = `find ${quoted} -mindepth 1 -maxdepth 1 -printf '%y\\t%s\\t%M\\t%TY-%Tm-%Td %TH:%TM\\t%f\\n' 2>/dev/null`;
+    const command = `if [ ! -d ${quoted} ]; then echo "DIRECTORY_NOT_FOUND" >&2; exit 2; fi; find ${quoted} -mindepth 1 -maxdepth 1 -printf '%y\\t%s\\t%M\\t%TY-%Tm-%Td %TH:%TM\\t%f\\n'`;
     const invocation = buildSshInvocation(profile, command);
     const result = await runProcess(invocation.executable, invocation.args, passwordEnvironment(profile, password));
-    if (result.code !== 0) throw new Error(result.stderr.trim() || "无法读取远程目录");
+    if (result.code !== 0) {
+      const err = result.stderr.trim();
+      if (err.includes("DIRECTORY_NOT_FOUND") || err.includes("No such file")) {
+        throw new Error(`远程目录 "${remotePath}" 不存在，请检查路径。`);
+      }
+      if (err.includes("Permission denied")) {
+        throw new Error(`无法读取远程目录 "${remotePath}"：权限不足。`);
+      }
+      throw new Error(err || `无法读取远程目录 "${remotePath}"`);
+    }
 
     return result.stdout.split(/\r?\n/).filter(Boolean).map((line) => {
       const [kind, size, permissions, modifiedAt, ...nameParts] = line.split("\t");

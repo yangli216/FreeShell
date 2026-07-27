@@ -754,7 +754,8 @@ export class FreeShellApp {
   private renderFiles(): void {
     const profile = this.selectedProfile();
     if (!profile) return this.renderDashboard();
-    let remotePath = `/home/${profile.username}`;
+    const defaultHome = profile.username === "root" ? "/root" : `/home/${profile.username}`;
+    let remotePath = defaultHome;
     let selectedRemoteFile = "";
     const listHost = VStack(4, [label("点击“刷新目录”读取远程文件。", 12, COLORS.muted)]);
     const pathInput = field(remotePath, (value) => { remotePath = value; });
@@ -795,11 +796,29 @@ export class FreeShellApp {
       }
     };
 
+    const goHome = actionButton("家目录 (~)", () => {
+      remotePath = defaultHome;
+      textfieldSetString(pathInput.input, remotePath);
+      void refreshDirectory();
+    });
+    const goRoot = actionButton("根目录 (/)", () => {
+      remotePath = "/";
+      textfieldSetString(pathInput.input, remotePath);
+      void refreshDirectory();
+    });
+    const goUp = actionButton("上一级 (..)", () => {
+      const parts = remotePath.split("/").filter(Boolean);
+      if (parts.length > 0) parts.pop();
+      remotePath = `/${parts.join("/")}`;
+      textfieldSetString(pathInput.input, remotePath);
+      void refreshDirectory();
+    });
+
     const upload = actionButton("上传", () => openFileDialog((localPath: string) => {
       if (!localPath) return;
       void this.ssh.upload(profile, localPath, remotePath, this.passwordFor(profile)).then(() => refreshDirectory()).catch((error) => alert("上传失败", String(error)));
     }));
-    const download = actionButton("下载路径…", () => saveFileDialog((localPath: string) => {
+    const download = actionButton("下载所选", () => saveFileDialog((localPath: string) => {
       if (!localPath) return;
       if (!selectedRemoteFile) {
         alert("请选择文件", "请先在文件列表中点击一个远程文件，再选择本地保存位置。");
