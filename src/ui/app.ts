@@ -177,6 +177,7 @@ export class FreeShellApp {
   private terminalUiDirty = false;
   private terminalOutput?: Widget;
   private terminalScroll?: Widget;
+  private activeTerminalInput?: Widget;
   private readonly commandHistory: string[] = [];
   private commandHistoryIndex = 0;
   private readonly rootHost = HStack(0, []);
@@ -369,7 +370,10 @@ export class FreeShellApp {
     const view = this.pendingView;
     this.pendingView = "";
     if (view === "dashboard") this.renderDashboard();
-    else if (view === "terminal") this.renderTerminal();
+    else if (view === "terminal") {
+      this.renderTerminal();
+      if (this.activeTerminalInput) focus(this.activeTerminalInput);
+    }
     else if (view === "files") this.renderFiles();
     else if (view === "monitoring") this.renderMonitoring();
     else if (view === "settings") this.renderSettings();
@@ -385,6 +389,7 @@ export class FreeShellApp {
     // native widget directly.
     this.terminalOutput = undefined;
     this.terminalScroll = undefined;
+    this.activeTerminalInput = undefined;
     widgetClearChildren(this.contentHost);
     widgetAddChild(this.contentHost, widget);
     widgetSetWidth(this.contentHost, 895);
@@ -711,6 +716,7 @@ export class FreeShellApp {
     this.setContent(body);
     this.terminalOutput = output;
     this.terminalScroll = outputScroll;
+    this.activeTerminalInput = input;
     this.terminalUiDirty = true;
     focus(input);
   }
