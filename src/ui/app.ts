@@ -192,8 +192,7 @@ export class FreeShellApp {
   }
 
   run(): void {
-    widgetSetWidth(this.rootHost, 1380);
-    widgetSetHeight(this.rootHost, 820);
+    widgetSetHugging(this.rootHost, 1);
     stackSetAlignment(this.rootHost, 3);
     stackSetDistribution(this.rootHost, 0);
     this.rebuildShell("dashboard");
@@ -246,7 +245,6 @@ export class FreeShellApp {
       label("Perry Native · v0.1.0", 10, COLORS.muted),
     ]);
     widgetSetWidth(navigation, 205);
-    widgetSetHeight(navigation, 820);
     widgetSetHugging(navigation, 750);
     stackSetAlignment(navigation, 7);
     fill(navigation, COLORS.sidebar);
@@ -264,13 +262,12 @@ export class FreeShellApp {
     const header = HStack(8, [label("服务器", 15, COLORS.text, 0.7), Spacer(), add]);
     const pane = VStack(12, [header, search.root, this.serverListHost]);
     widgetSetWidth(pane, 280);
-    widgetSetHeight(pane, 820);
     widgetSetHugging(pane, 750);
     stackSetAlignment(pane, 7);
     fill(pane, COLORS.panel);
     widgetSetEdgeInsets(pane, 18, 14, 16, 14);
     widgetSetWidth(this.serverListHost, 250);
-    widgetSetHeight(this.serverListHost, 680);
+    widgetSetHugging(this.serverListHost, 1);
     stackSetAlignment(this.serverListHost, 7);
     stackSetDistribution(this.serverListHost, 0);
     return pane;
@@ -392,8 +389,6 @@ export class FreeShellApp {
     this.activeTerminalInput = undefined;
     widgetClearChildren(this.contentHost);
     widgetAddChild(this.contentHost, widget);
-    widgetSetWidth(this.contentHost, 895);
-    widgetSetHeight(this.contentHost, 820);
     widgetSetHugging(this.contentHost, 1);
     stackSetAlignment(this.contentHost, 7);
     fill(this.contentHost, COLORS.app);
@@ -636,8 +631,7 @@ export class FreeShellApp {
 
     const outputScroll = ScrollView();
     scrollviewSetChild(outputScroll, output);
-    widgetSetWidth(outputScroll, 850);
-    widgetSetHeight(outputScroll, 620);
+    widgetSetHugging(outputScroll, 1);
     widgetSetEdgeInsets(outputScroll, 16, 18, 16, 18);
     widgetSetBackgroundColor(outputScroll, ...COLORS.raised);
 
@@ -652,7 +646,6 @@ export class FreeShellApp {
     textfieldSetTextColor(input, 0.92, 0.95, 0.98, 1);
     widgetSetControlSize(input, 2);
     widgetSetHeight(input, 28);
-    widgetSetWidth(input, 780);
     widgetSetHugging(input, 1);
 
     const submitCommand = () => {
@@ -719,13 +712,13 @@ export class FreeShellApp {
 
     const inputRow = HStack(8, [label("❯", 15, COLORS.green, 0.72), input]);
     widgetSetHeight(inputRow, 40);
+    widgetSetHugging(inputRow, 750);
     widgetSetEdgeInsets(inputRow, 4, 16, 8, 16);
     widgetSetBackgroundColor(inputRow, ...COLORS.raised);
 
     const consoleHost = VStack(0, [outputScroll, inputRow]);
     const console = surface(consoleHost, COLORS.raised, 10);
-    widgetSetWidth(console, 850);
-    widgetSetHeight(console, 665);
+    widgetSetHugging(console, 1);
     widgetSetOnClick(console, focusInput);
 
     const body = VStack(10, [header, hInset(0, 0, 22, 18, 22, [console])]);
