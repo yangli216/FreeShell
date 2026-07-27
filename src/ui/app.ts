@@ -198,7 +198,7 @@ export class FreeShellApp {
     this.rebuildShell("dashboard");
     // Perry process callbacks are not guaranteed to run on AppKit's main
     // thread. Flush background session state and deferred navigation here.
-    appSetTimer(100, () => this.flushUiUpdates());
+    appSetTimer(40, () => this.flushUiUpdates());
 
     App({
       title: "FreeShell — Remote Operations",

@@ -109,6 +109,11 @@ test("removes terminal title and ANSI control sequences from PTY output", () => 
   assert.equal(sanitizeTerminalOutput(raw), "root@host\nprogress\n");
 });
 
+test("parses screen clear sequences to refresh top/htop terminal views", () => {
+  const raw = "frame 1 output\n\u001b[2J\u001b[Htop - 09:50:00 up 10 days\nTasks: 120 total";
+  assert.equal(sanitizeTerminalOutput(raw), "top - 09:50:00 up 10 days\nTasks: 120 total");
+});
+
 test("turns common SSH failures into actionable messages", () => {
   assert.equal(
     formatSshError("ssh: Could not resolve hostname missing.invalid: nodename nor servname provided", 255),
