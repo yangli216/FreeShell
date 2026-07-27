@@ -9,6 +9,7 @@ output = "dist/freeshell"
 [app]
 name = "FreeShell"
 identifier = "com.freeshell.desktop"
+icon = "assets/icon.png"
 
 [i18n]
 default_locale = "zh-CN"
