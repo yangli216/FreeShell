@@ -1,11 +1,3 @@
 {
-  "搜索服务器…": "Search servers…",
-  "终端输出": "Terminal output",
-  "输入命令并按 Enter…": "Enter a command and press Enter…",
-  "服务器名称": "Server name",
-  "主机名或 IP": "Hostname or IP",
-  "SSH 端口（默认 22）": "SSH port (default 22)",
-  "用户名": "Username",
-  "分组": "Group",
-  "私钥路径（使用 Agent 时留空）": "Private key path (leave empty for SSH Agent)"
+  "在此输入命令，按 Enter 发送…": "Enter command and press Enter…"
 }
