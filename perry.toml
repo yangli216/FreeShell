@@ -1,0 +1,15 @@
+[project]
+name = "FreeShell"
+version = "0.1.0"
+
+[build]
+entry = "src/main.ts"
+output = "dist/freeshell"
+
+[app]
+name = "FreeShell"
+identifier = "com.freeshell.desktop"
+
+[i18n]
+default_locale = "zh-CN"
+locales = ["zh-CN", "en"]

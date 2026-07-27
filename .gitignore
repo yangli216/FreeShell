@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+*.log
+*.pem
+*.key
+freeshell-data/
+.perry/
+.perry-trace/
+
