@@ -92,7 +92,7 @@ function field(placeholder: string, onChange: (value: string) => void): FieldCon
   textfieldSetBorderless(input, 1);
   textfieldSetFontSize(input, 13);
   widgetSetControlSize(input, 2);
-  textfieldSetBackgroundColor(input, 0.94, 0.96, 0.98, 1);
+  textfieldSetBackgroundColor(input, ...COLORS.buttonSecondary);
   textfieldSetTextColor(input, ...COLORS.buttonInk);
   widgetSetHeight(input, 22);
   widgetSetHugging(input, 1);
@@ -102,7 +102,7 @@ function field(placeholder: string, onChange: (value: string) => void): FieldCon
   // control inside a padded frame instead.
   const frame = HStack(0, [input]);
   stackSetAlignment(frame, 12);
-  widgetSetBackgroundColor(frame, 0.94, 0.96, 0.98, 1);
+  widgetSetBackgroundColor(frame, ...COLORS.buttonSecondary);
   widgetSetBorderColor(frame, ...COLORS.border);
   widgetSetBorderWidth(frame, 1);
   widgetSetEdgeInsets(frame, 7, 12, 7, 12);
@@ -122,7 +122,7 @@ function secureField(placeholder: string, onChange: (value: string) => void): Fi
   // APIs here so the password cannot accidentally become a plain TextField.
   const frame = HStack(0, [input]);
   stackSetAlignment(frame, 12);
-  widgetSetBackgroundColor(frame, 0.94, 0.96, 0.98, 1);
+  widgetSetBackgroundColor(frame, ...COLORS.buttonSecondary);
   widgetSetBorderColor(frame, ...COLORS.border);
   widgetSetBorderWidth(frame, 1);
   widgetSetEdgeInsets(frame, 7, 12, 7, 12);
@@ -162,6 +162,7 @@ export class FreeShellApp {
   private selectedId = this.store.profiles[0]?.id ?? "";
   private serverFilter = "";
   private session?: RunningSession;
+  private currentView: ViewName = "dashboard";
   private status: ConnectionStatus = "offline";
   private statusMessage = "未连接";
   private statusUiDirty = false;
@@ -210,6 +211,7 @@ export class FreeShellApp {
   }
 
   private rebuildShell(view: ViewName): void {
+    this.currentView = view;
     widgetClearChildren(this.rootHost);
     this.contentHost = VStack(0, []);
     this.serverListHost = VStack(6, []);
@@ -231,17 +233,17 @@ export class FreeShellApp {
     inset(brandMark, 9, 11, 9, 11);
     const brand = HStack(10, [brandMark, VStack(1, [label("FreeShell", 16, COLORS.text, 0.75), label("REMOTE OPS", 9, COLORS.muted, 0.6)])]);
 
+    const v = this.currentView;
     const navigation = VStack(7, [
       brand,
       label("工作台", 10, COLORS.muted, 0.62),
-      navButton("总览", () => this.scheduleView("dashboard"), true),
-      navButton("服务器", () => this.scheduleView("dashboard")),
-      navButton("终端", () => this.scheduleView("terminal")),
-      navButton("文件传输", () => this.scheduleView("files")),
-      navButton("性能监控", () => this.scheduleView("monitoring")),
+      navButton("总览", () => this.scheduleView("dashboard"), v === "dashboard"),
+      navButton("终端", () => this.scheduleView("terminal"), v === "terminal"),
+      navButton("文件传输", () => this.scheduleView("files"), v === "files"),
+      navButton("性能监控", () => this.scheduleView("monitoring"), v === "monitoring"),
       Spacer(),
       Divider(),
-      navButton("偏好设置", () => this.scheduleView("settings")),
+      navButton("偏好设置", () => this.scheduleView("settings"), v === "settings"),
       label("Perry Native · v0.1.0", 10, COLORS.muted),
     ]);
     widgetSetWidth(navigation, 205);
@@ -331,6 +333,7 @@ export class FreeShellApp {
 
   private scheduleView(view: ViewName): void {
     this.pendingView = view;
+    this.currentView = view;
   }
 
   private flushUiUpdates(): void {
@@ -349,7 +352,8 @@ export class FreeShellApp {
     if (this.terminalUiDirty) {
       this.terminalUiDirty = false;
       if (this.terminalOutput) {
-        const displayText = this.terminalDraft ? `${this.terminalBuffer}${this.terminalDraft}█` : `${this.terminalBuffer}█`;
+        const cursor = this.session ? "█" : "";
+        const displayText = this.terminalDraft ? `${this.terminalBuffer}${this.terminalDraft}${cursor}` : `${this.terminalBuffer}${cursor}`;
         textSetString(this.terminalOutput, displayText);
         if (this.terminalScroll) scrollViewScrollTo(this.terminalScroll, 0, 1000000);
       }
@@ -623,7 +627,8 @@ export class FreeShellApp {
   private renderTerminal(): void {
     const profile = this.selectedProfile();
     if (!profile) return this.renderDashboard();
-    const initialText = this.terminalDraft ? `${this.terminalBuffer}${this.terminalDraft}█` : `${this.terminalBuffer}█`;
+    const cursor = this.session ? "█" : "";
+    const initialText = this.terminalDraft ? `${this.terminalBuffer}${this.terminalDraft}${cursor}` : `${this.terminalBuffer}${cursor}`;
     const output = terminalMono(initialText, 13);
     textSetSelectable(output, 1);
     textSetWraps(output, 100000);
@@ -649,7 +654,10 @@ export class FreeShellApp {
     widgetSetHugging(input, 1);
 
     const submitCommand = () => {
-      if (!this.session) return;
+      if (!this.session) {
+        alert("未连接", "请先在总览页连接服务器后再输入命令。");
+        return;
+      }
       const submitted = this.terminalDraft;
       if (submitted.trim()) {
         if (this.commandHistory.at(-1) !== submitted) this.commandHistory.push(submitted);
@@ -765,6 +773,25 @@ export class FreeShellApp {
     }, true);
     const header = this.buildTopBar("性能监控", `${profile.name} · 实时资源概览`, [refresh]);
     this.setContent(VStack(14, [header, metricsHost, hInset(12, 0, 22, 18, 22, [details])]));
+    // Auto-refresh metrics on entering the monitoring tab
+    void refresh.click?.();
+    void (async () => {
+      widgetClearChildren(metricsHost);
+      widgetAddChild(metricsHost, this.metricCard("采集中", 0, "正在读取远程状态…"));
+      try {
+        const metrics = await this.ssh.fetchMetrics(profile, this.passwordFor(profile));
+        widgetClearChildren(metricsHost);
+        widgetAddChild(metricsHost, this.metricCard("CPU", metrics.cpuPercent, `${metrics.cpuPercent.toFixed(1)}%`));
+        widgetAddChild(metricsHost, this.metricCard("内存", metrics.memoryPercent, `${metrics.memoryPercent.toFixed(1)}%`));
+        widgetAddChild(metricsHost, this.metricCard("磁盘 /", metrics.diskPercent, `${metrics.diskPercent.toFixed(1)}%`));
+        widgetClearChildren(details);
+        widgetAddChild(details, label("系统状态", 14, COLORS.text, 0.68));
+        widgetAddChild(details, this.infoRow("负载均值", metrics.loadAverage));
+        widgetAddChild(details, this.infoRow("运行时间", metrics.uptime));
+        widgetAddChild(details, this.infoRow("进程数量", String(metrics.processes)));
+        widgetAddChild(details, this.infoRow("更新时间", new Date(metrics.updatedAt).toLocaleTimeString()));
+      } catch { /* silently skip auto-refresh failures */ }
+    })();
   }
 
   private metricCard(name: string, percent: number, detail: string): Widget {
@@ -869,16 +896,21 @@ export class FreeShellApp {
       if (!localPath) return;
       void this.ssh.upload(profile, localPath, remotePath, this.passwordFor(profile)).then(() => refreshDirectory()).catch((error) => alert("上传失败", String(error)));
     }));
-    const download = actionButton("下载所选", () => saveFileDialog((localPath: string) => {
-      if (!localPath) return;
+    const download = actionButton("下载所选", () => {
       if (!selectedRemoteFile) {
         alert("请选择文件", "请先在文件列表中点击一个远程文件，再选择本地保存位置。");
         return;
       }
-      void this.ssh.download(profile, selectedRemoteFile, localPath, this.passwordFor(profile))
-        .then(() => alert("下载完成", `已保存到 ${localPath}`))
-        .catch((error) => alert("下载失败", String(error)));
-    }, "download", "bin"));
+      const remoteBasename = selectedRemoteFile.split("/").pop() || "download";
+      const extMatch = remoteBasename.match(/\.([^.]+)$/);
+      const ext = extMatch ? extMatch[1] : "bin";
+      saveFileDialog((localPath: string) => {
+        if (!localPath) return;
+        void this.ssh.download(profile, selectedRemoteFile, localPath, this.passwordFor(profile))
+          .then(() => alert("下载完成", `已保存到 ${localPath}`))
+          .catch((error) => alert("下载失败", String(error)));
+      }, remoteBasename, ext);
+    });
     const refresh = actionButton("刷新目录", () => { void refreshDirectory(); }, true);
     const header = this.buildTopBar("文件传输", `${profile.name} · SCP/SFTP 工作区`, [upload, download, refresh]);
     const pathBar = hInset(8, 0, 22, 0, 22, [label("路径", 11, COLORS.muted), pathInput.root]);
@@ -1020,7 +1052,26 @@ export class FreeShellApp {
       label("私钥（仅私钥模式）", 11, COLORS.muted), key.root,
       label("密码（永久保存到系统安全钥匙串）", 11, COLORS.muted), password.root,
       Spacer(),
-      HStack(8, [Spacer(), actionButton("取消", () => editor.close()), save]),
+      HStack(8, [
+        existing ? actionButton("删除服务器", () => {
+          alertWithButtons("确认删除", `确定要删除服务器「${existing.name}」吗？此操作不可撤销。`, ["取消", "删除"], (index) => {
+            if (index !== 1) return;
+            this.store.removeProfile(existing.id);
+            this.deleteStoredPassword(existing.id);
+            this.passwords.delete(existing.id);
+            if (this.selectedId === existing.id) {
+              this.selectedId = this.store.profiles[0]?.id ?? "";
+              if (this.session) this.disconnect();
+            }
+            editor.close();
+            this.serverListDirty = true;
+            this.scheduleView("dashboard");
+          });
+        }) : Spacer(),
+        Spacer(),
+        actionButton("取消", () => editor.close()),
+        save,
+      ]),
     ]);
     fill(body, COLORS.app);
     editor.setBody(body);
